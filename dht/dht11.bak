@@ -1,0 +1,191 @@
+/**
+  ******************************************************************************
+  * Ten Tep      :        dht11.c
+  * Tac Gia      :        Nguyen Quy Nhat
+  * Cong Ty      :        MinhHaGroup
+  * Website      :        BanLinhKien.Vn
+  * Phien Ban    :        V1.0.0
+  * Ngay         :        31-07-2012
+  * Tom Tat      :        Dinh nghia cac ham dieu khien dht11.
+  *           
+  *
+  ******************************************************************************
+  * Chu Y        :   Phai dinh nghia cac chan su dung cho DHT11 vao file main.h
+  *                Vi Du:
+                                PIC       AVR       8051
+#define         DHT_DATA_IN     PINB0     PINB.0    P2_0
+#define         DHT_DATA_OUT    PORTB0    PORTB.0   P2_0
+               Voi PIC va AVR can dinh nghia them huong du lieu.
+                                PIC       AVR       8051
+#define         DHT_DDR_DATA    DDRB0     DDRB.0    P2_0              
+  ******************************************************************************
+**/
+
+/*********************************** VI DU ************************************
+    uint8_t dht_nhiet_do,dht_do_am,dht_Ok;
+    dht_Ok = DHT_GetTemHumi(&dht_nhiet_do,&dht_do_am);
+*******************************************************************************/
+#include "dht11.h"
+
+ /*******************************************************************************
+Noi Dung    :   MCU gui yeu cau chuyen doi den DHT11.
+Tham Bien   :   Khong.
+Tra Ve      :   Khong.
+********************************************************************************/
+extern uint8_t str[20];
+extern uint8_t count_ok;
+extern uint8_t count_er;
+//void DHT_Start()
+uint8_t DHT_Start()
+{
+   uint8_t time_out=0;
+    DHT_DDR_DATA=DDROUT;   // set la cong ra
+    DHT_DATA_OUT=1;
+    delay_us(60);
+    DHT_DATA_OUT=0;
+    delay_ms(25); // it nhat 18ms
+    DHT_DATA_OUT=1;
+    //delay_us(40); // doi DHT dap ung trong vong 20us-40us
+   DHT_DDR_DATA=DDRIN;
+   delay_us(60);
+   if(DHT_DATA_IN)return DHT_ER ;
+   while((!DHT_DATA_IN)&&(time_out<20))
+      {   
+         delay_us(10);
+         time_out++;
+      }
+   if(time_out==20) return DHT_ER;
+   else   time_out=0;
+    delay_us(60);
+    if(!DHT_DATA_IN)return DHT_ER;
+    while((DHT_DATA_IN)&&(time_out<20))
+      {   
+         delay_us(10);
+         time_out++;
+      }
+   if(time_out==20) return DHT_ER;
+   else   return DHT_OK;
+}
+
+ /*******************************************************************************
+Noi Dung    :   Kiem tra dap ung cua DHT11 sau yeu cau chuyen doi.
+Tham Bien   :   Khong.
+Tra Ve      :   DHT_ER: Dap ung cua DHT bi loi.
+                DHT_OK: Dap ung cua DHT thanh cong.
+********************************************************************************/  
+/*uint8_t   DHT_IsOk()
+{
+   uint8_t time_out;
+   //DHT_DDR_DATA=DDRIN;  // set la cong vao.
+   delay_us(40);
+   if(DHT_DATA_IN)return DHT_ER ;
+   while((!DHT_DATA_IN)&&(time_out<20))
+      {   
+         delay_us(10);
+         time_out++;
+      }
+   if(time_out==20) return DHT_ER;
+   else   time_out=0;
+    delay_us(60);
+    if(!DHT_DATA_IN)return DHT_ER;
+    while((DHT_DATA_IN)&&(time_out<20))
+      {   
+         delay_us(10);
+         time_out++;
+      }
+   if(time_out==20) return DHT_ER;
+   else   return DHT_OK;
+} 
+*/
+/*******************************************************************************
+Noi Dung    :   Doc 1 byte du lieu tu DHT11.
+Tham Bien   :   Khong.
+Tra Ve      :   1 byte du lieu.
+ *******************************************************************************/
+ 
+uint8_t DHT_ReadByte()
+{
+   uint8_t byte=0,ii;
+   uint8_t time_out;
+   for(ii=0;ii<8;ii++)
+   {
+   while((!DHT_DATA_IN)&&(time_out<20))
+      {   
+         delay_us(10);
+         time_out++;
+      }
+   if(time_out==20) return time_out;
+   else   time_out=0;
+   delay_us(50);
+   if(DHT_DATA_IN)
+   byte|=(1<<(7-ii));
+   while((DHT_DATA_IN)&&(time_out<20))
+      {   
+         delay_us(10);
+         time_out++;
+      }
+   if(time_out==20) return time_out;
+   }
+   return byte;
+}
+
+/*******************************************************************************
+Noi Dung    :   Doc 1 khung du lieu tu DHT11 gui ve.
+Tham Bien   :   array: mang so nguyen 8 bit luu tru khung du lieu.
+Tra Ve      :   - DHT_OK:   Neu DHT va MCU gui du lieu thanh cong.
+                - DHT_ER:   Neu DHT va MCU gui du lieu that bai.
+ *******************************************************************************/
+ 
+uint8_t DHT_GetFrame(uint8_t *array)
+{       
+   uint8_t i;
+   //uint16_t checksum;
+   uint8_t checksum;
+   for(i=0;i<5;i++)
+   array[i]=DHT_ReadByte();
+   checksum=array[0]+array[1]+array[2]+array[3];
+   DHT_DDR_DATA=DDROUT;
+   DHT_DATA_OUT=1; 
+   //if((checksum&0x00ff)!=array[4])
+   if((checksum)!=array[4])
+   {
+           sprintf(str,"Sai So:");
+           LCD_Gotoxy(0,0);
+           //LCD_Puts(str);
+            count_er++;
+            return DHT_ER;
+   }
+   count_ok++;
+   return DHT_OK;
+}
+
+/*******************************************************************************
+Noi Dung    :   Doc gia tri nhiet do, do am tu DHT.
+Tham Bien   :   *tem:    con tro luu tru gia tri nhiet do.
+                *humi:   con tro luu tru gia tri do am.   
+Tra Ve      :   - DHT_OK:   Neu do nhiet do,do am thanh cong.
+                - DHT_ER:   Neu do nhiet do, do am xay ra loi.
+ *******************************************************************************/
+uint8_t DHT_GetTemHumi (uint8_t *tem,uint8_t *humi)
+{
+   uint8_t DHT_Buffer[5];
+   //DHT_Start();
+   if(DHT_Start()==DHT_OK)
+   {
+      if(DHT_GetFrame(DHT_Buffer)==DHT_OK)
+      {
+      *tem  =   DHT_Buffer[2];
+      *humi =   DHT_Buffer[0];
+      return DHT_OK;
+      }
+      else
+      {
+      return DHT_ER;
+      }
+   }
+   else
+   return DHT_ER;
+}
+
+/******************************KET THUC FILE******************************
+______________________________NGUYEN QUY NHAT______________________________*/
